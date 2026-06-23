@@ -2,60 +2,50 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<title>Color Box Prototype V2</title>
+<title>Color Box Responsive V3</title>
 
 <style>
 body {
+    margin: 0;
     font-family: Arial;
-    margin: 20px;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
 }
 
 .controls {
-    margin-bottom: 10px;
-}
-
-label {
-    margin-right: 10px;
+    padding: 10px;
+    background: #f2f2f2;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
 }
 
 canvas {
-    border: 2px solid #333;
+    flex: 1;
+    display: block;
+    width: 100%;
+    height: 100%;
     touch-action: none;
-    cursor: crosshair;
+    background: white;
 }
 
 .info {
-    margin-top: 10px;
-    font-size: 18px;
+    padding: 8px;
+    background: #eee;
 }
 </style>
 </head>
 
 <body>
 
-<h2>Color Box Prototype V2</h2>
-
 <div class="controls">
-    <label>
-        Rows:
-        <input id="rows" type="number" value="8" min="2" max="30">
-    </label>
-
-    <label>
-        Cols:
-        <input id="cols" type="number" value="8" min="2" max="30">
-    </label>
-
-    <label>
-        Colors:
-        <input id="colorCount" type="number" value="4" min="2" max="10">
-    </label>
-
-    <label>
-        Timer:
-        <input id="timerSeconds" type="number" value="60" min="30" max="180">
-    </label>
-
+    Rows <input id="rows" type="number" value="8" min="2" max="30">
+    Cols <input id="cols" type="number" value="8" min="2" max="30">
+    Colors <input id="colorCount" type="number" value="4" min="2" max="10">
+    Timer <input id="timerSeconds" type="number" value="60" min="30" max="180">
     <button onclick="generateBoard()">Generate</button>
 </div>
 
@@ -69,12 +59,9 @@ canvas {
 
 <script>
 
-const CELL = 50;
-
 const palette = [
     "#ff5252","#4caf50","#2196f3","#ffeb3b",
-    "#9c27b0","#ff9800","#00bcd4","#795548",
-    "#e91e63","#607d8b"
+    "#9c27b0","#ff9800","#00bcd4","#795548"
 ];
 
 let board = [];
@@ -85,17 +72,39 @@ let colorCount = 4;
 let score = 0;
 let combo = 1;
 
+let timeLeft = 60;
+let gameRunning = false;
+
 let dragStart = null;
 let dragCurrent = null;
 
 let comboTimer = null;
-
-let timeLeft = 60;
 let gameTimer = null;
-let gameRunning = false;
 
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
+
+let CELL = 40; // 動態更新
+
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight - 60; // 留 control/info 空間
+    draw();
+}
+
+window.addEventListener("resize", () => {
+    resizeCanvas();
+});
+
+function calcCellSize() {
+
+    CELL = Math.floor(
+        Math.min(
+            canvas.width / cols,
+            canvas.height / rows
+        )
+    );
+}
 
 function updateUI() {
     document.getElementById("score").textContent = score;
@@ -124,8 +133,7 @@ function startTimer() {
 function gameOver() {
     gameRunning = false;
     clearInterval(gameTimer);
-
-    alert("Time Up!\nScore: " + score);
+    alert("Game Over\nScore: " + score);
 }
 
 function generateBoard() {
@@ -133,16 +141,12 @@ function generateBoard() {
     rows = +document.getElementById("rows").value;
     cols = +document.getElementById("cols").value;
     colorCount = +document.getElementById("colorCount").value;
-
     timeLeft = +document.getElementById("timerSeconds").value;
-
-    canvas.width = cols * CELL;
-    canvas.height = rows * CELL;
 
     board = [];
 
     for(let r=0;r<rows;r++){
-        const row = [];
+        let row = [];
         for(let c=0;c<cols;c++){
             row.push({
                 color: Math.floor(Math.random()*colorCount),
@@ -158,12 +162,18 @@ function generateBoard() {
 
     updateUI();
     startTimer();
-    draw();
+
+    resizeCanvas();
 }
 
 function draw() {
 
     ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    calcCellSize();
+
+    const offsetX = (canvas.width - cols*CELL)/2;
+    const offsetY = (canvas.height - rows*CELL)/2;
 
     for(let r=0;r<rows;r++){
         for(let c=0;c<cols;c++){
@@ -174,10 +184,20 @@ function draw() {
                 ? "#fff"
                 : palette[cell.color];
 
-            ctx.fillRect(c*CELL,r*CELL,CELL,CELL);
+            ctx.fillRect(
+                offsetX + c*CELL,
+                offsetY + r*CELL,
+                CELL,
+                CELL
+            );
 
             ctx.strokeStyle = "#000";
-            ctx.strokeRect(c*CELL,r*CELL,CELL,CELL);
+            ctx.strokeRect(
+                offsetX + c*CELL,
+                offsetY + r*CELL,
+                CELL,
+                CELL
+            );
         }
     }
 
@@ -194,7 +214,7 @@ function draw() {
     }
 }
 
-function getMouse(e) {
+function getPos(e) {
     const rect = canvas.getBoundingClientRect();
     return {
         x: e.clientX - rect.left,
@@ -210,27 +230,30 @@ function getTouch(t) {
     };
 }
 
+/* INPUT */
+
 canvas.addEventListener("mousedown", e => {
     if(!gameRunning) return;
-    dragStart = getMouse(e);
+    dragStart = getPos(e);
     dragCurrent = dragStart;
 });
 
 canvas.addEventListener("mousemove", e => {
     if(!dragStart || !gameRunning) return;
-    dragCurrent = getMouse(e);
+    dragCurrent = getPos(e);
     draw();
 });
 
 canvas.addEventListener("mouseup", () => {
     if(!gameRunning) return;
-    processSelection();
+    process();
     dragStart = null;
     dragCurrent = null;
     draw();
 });
 
-// TOUCH
+/* TOUCH */
+
 canvas.addEventListener("touchstart", e => {
     if(!gameRunning) return;
     e.preventDefault();
@@ -245,15 +268,18 @@ canvas.addEventListener("touchmove", e => {
     draw();
 },{passive:false});
 
-canvas.addEventListener("touchend", e => {
+canvas.addEventListener("touchend", () => {
     if(!gameRunning) return;
-    processSelection();
+    process();
     dragStart = null;
     dragCurrent = null;
     draw();
 });
 
-function processSelection() {
+function process() {
+
+    const offsetX = (canvas.width - cols*CELL)/2;
+    const offsetY = (canvas.height - rows*CELL)/2;
 
     const left = Math.min(dragStart.x, dragCurrent.x);
     const right = Math.max(dragStart.x, dragCurrent.x);
@@ -265,16 +291,16 @@ function processSelection() {
     for(let r=0;r<rows;r++){
         for(let c=0;c<cols;c++){
 
-            const x = c*CELL;
-            const y = r*CELL;
+            const x = offsetX + c*CELL;
+            const y = offsetY + r*CELL;
 
-            const overlap =
+            const hit =
                 x < right &&
-                x+CELL > left &&
+                x + CELL > left &&
                 y < bottom &&
-                y+CELL > top;
+                y + CELL > top;
 
-            if(overlap && !board[r][c].removed){
+            if(hit && !board[r][c].removed){
                 selected.push({
                     r,c,
                     color:board[r][c].color
@@ -289,23 +315,24 @@ function processSelection() {
         return;
     }
 
-    const first = selected[0].color;
+    const color = selected[0].color;
 
-    const valid = selected.every(s => s.color === first);
-
-    if(!valid) {
+    if(!selected.every(s => s.color === color)) {
         combo = 1;
         updateUI();
         return;
     }
 
     const base = selected.length * selected.length;
-
     score += base * combo;
 
     combo++;
 
-    resetComboTimer();
+    clearTimeout(comboTimer);
+    comboTimer = setTimeout(() => {
+        combo = 1;
+        updateUI();
+    },3000);
 
     selected.forEach(s => {
         board[s.r][s.c].removed = true;
@@ -314,17 +341,8 @@ function processSelection() {
     updateUI();
 }
 
-function resetComboTimer() {
-
-    clearTimeout(comboTimer);
-
-    comboTimer = setTimeout(() => {
-        combo = 1;
-        updateUI();
-    },3000);
-}
-
 generateBoard();
+resizeCanvas();
 
 </script>
 
